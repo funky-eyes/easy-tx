@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package icu.funkye.easy.tx.feign.hystrix;
+package icu.funkye.easy.tx.integration.http.feign.hystrix;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;

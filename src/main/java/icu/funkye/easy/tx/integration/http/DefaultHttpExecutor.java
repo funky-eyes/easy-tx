@@ -13,7 +13,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package icu.funkye.easy.tx.http;
+package icu.funkye.easy.tx.integration.http;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;

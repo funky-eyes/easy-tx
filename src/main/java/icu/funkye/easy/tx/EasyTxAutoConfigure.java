@@ -19,7 +19,8 @@ import org.springframework.context.annotation.Configuration;
  * @author 陈健斌 funkye
  */
 @ComponentScan(basePackages = {"icu.funkye.easy.tx.config", "icu.funkye.easy.tx.listener", "icu.funkye.easy.tx.aspect",
-    "icu.funkye.easy.tx.http", "icu.funkye.easy.tx.feign", "icu.funkye.easy.tx.properties"})
+    "icu.funkye.easy.tx.proxy", "icu.funkye.easy.tx.integration", "icu.funkye.easy.tx.integration.dubbo",
+    "icu.funkye.easy.tx.integration.http", "icu.funkye.easy.tx.integration.feign", "icu.funkye.easy.tx.properties"})
 @EnableConfigurationProperties({RocketMqProperties.class})
 @Configuration
 public class EasyTxAutoConfigure {
@@ -34,18 +35,24 @@ public class EasyTxAutoConfigure {
 
     @Bean
     public DefaultMQProducer easyTxProducer() throws MQClientException {
-        LOGGER.info("defaultProducer 正在创建---------------------------------------");
+        if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("easyTxProducer 正在创建---------------------------------------");
+        }
         DefaultMQProducer producer = new DefaultMQProducer(prop.getGroup());
         producer.setNamesrvAddr(prop.getNameServer());
         producer.setVipChannelEnabled(false);
         producer.start();
-        LOGGER.info("rocketmq producer server 开启成功----------------------------------");
+        if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("rocketmq producer server 开启成功----------------------------------");
+        }
         return producer;
     }
 
     @Bean
     public DefaultMQPushConsumer easyTxConsumer() throws MQClientException {
-        LOGGER.info("defaultConsumer 正在创建---------------------------------------");
+        if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("easyTxConsumer 正在创建---------------------------------------");
+        }
         DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(prop.getGroup());
         consumer.setNamesrvAddr(prop.getNameServer());
         // 设置监听
@@ -65,10 +72,14 @@ public class EasyTxAutoConfigure {
             consumer.setVipChannelEnabled(false);
             consumer.subscribe(prop.getTopic(), "*");
             consumer.start();
-            LOGGER.info("consumer 创建成功 groupName={}, topics={}, namesrvAddr={}", prop.getGroup(), prop.getTopic(),
-                prop.getNameServer());
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("consumer 创建成功 groupName={}, topics={}, namesrvAddr={}", prop.getGroup(), prop.getTopic(),
+                    prop.getNameServer());
+            }
         } catch (MQClientException e) {
-            LOGGER.error("consumer 创建失败!");
+            if (LOGGER.isErrorEnabled()) {
+                LOGGER.error("consumer 创建失败! error: {}", e.getMessage());
+            }
         }
         return consumer;
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package icu.funkye.easy.tx.feign.hystrix;
+package icu.funkye.easy.tx.integration.http.feign.hystrix;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
