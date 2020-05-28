@@ -1,6 +1,8 @@
 package icu.funkye.easy.tx.aspect;
 
 import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.List;
 import icu.funkye.easy.tx.config.RootContext;
 import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.proxy.ConnectionFactory;
@@ -26,8 +28,13 @@ public class DataSourceAspect {
 
     @Around("execution(* javax.sql.DataSource.getConnection(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(RootContext.getXID());
+        if (list == null) {
+            list = new ArrayList<>();
+        }
         ConnectionProxy connectionProxy = new ConnectionProxy((Connection)joinPoint.proceed());
-        ConnectionFactory.getConcurrentHashMap().put(RootContext.getXID(), connectionProxy);
+        list.add(connectionProxy);
+        ConnectionFactory.getConcurrentHashMap().put(RootContext.getXID(), list);
         return connectionProxy;
     }
 

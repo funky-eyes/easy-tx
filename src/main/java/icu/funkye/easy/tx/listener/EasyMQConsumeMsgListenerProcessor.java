@@ -42,10 +42,13 @@ public class EasyMQConsumeMsgListenerProcessor implements MessageListenerConcurr
             JSONObject object = JSONObject.parseObject(body);
             String xid = object.get(RootContext.KEY_XID).toString();
             LOGGER.info("MQ消息topic={}, tags={}, 消息内容={}", topic, tags, body);
-            ConnectionProxy connectionProxy = ConnectionFactory.getConcurrentHashMap().get(xid);
-            if (connectionProxy != null) {
+            List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(xid);
+            if (list != null) {
                 try {
-                    connectionProxy.notify(Integer.valueOf(object.get(RootContext.XID_STATUS).toString()));
+                    Integer status = Integer.valueOf(object.get(RootContext.XID_STATUS).toString());
+                    list.forEach(i -> {
+                        i.notify(status);
+                    });
                 } finally {
                     ConnectionFactory.getConcurrentHashMap().remove(xid);
                 }
