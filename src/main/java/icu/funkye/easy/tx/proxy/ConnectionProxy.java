@@ -18,22 +18,18 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
 
-import icu.funkye.easy.tx.properties.EasyTxProperties;
-@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true", matchIfMissing = true)
-@Component
-@Scope("prototype")
 public class ConnectionProxy implements Connection {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionProxy.class);
 
     private Connection connection;
+
+    public ConnectionProxy(Connection connection) {
+        this.connection = connection;
+    }
 
     public void notify(int state) {
         try {
