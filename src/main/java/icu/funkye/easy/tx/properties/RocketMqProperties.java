@@ -1,12 +1,13 @@
 package icu.funkye.easy.tx.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
 /**
  * @author 陈健斌 funkye
  */
 @ConfigurationProperties(prefix = RocketMqProperties.ROCKET_PREFIX)
 public class RocketMqProperties {
-    public static final String ROCKET_PREFIX = "funkye.rocket";
+    public static final String ROCKET_PREFIX = EasyTxProperties.EASY_TX_PREFIX + ".rocket";
 
     private String nameServer;
 

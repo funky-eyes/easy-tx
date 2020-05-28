@@ -12,6 +12,7 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ import icu.funkye.easy.tx.properties.RocketMqProperties;
  * @author chenjianbin
  * @version 1.0.0
  */
+@ConditionalOnBean(name = {"easyTxProducer"})
 @Order(value = 100)
 @Aspect
 @Component

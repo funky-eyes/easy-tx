@@ -1,6 +1,7 @@
 package icu.funkye.easy.tx;
 
 import icu.funkye.easy.tx.listener.EasyMQConsumeMsgListenerProcessor;
+import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.properties.RocketMqProperties;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.exception.MQClientException;
@@ -10,6 +11,7 @@ import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -21,12 +23,16 @@ import org.springframework.context.annotation.Configuration;
 @ComponentScan(basePackages = {"icu.funkye.easy.tx.config", "icu.funkye.easy.tx.listener", "icu.funkye.easy.tx.aspect",
     "icu.funkye.easy.tx.proxy", "icu.funkye.easy.tx.integration", "icu.funkye.easy.tx.integration.dubbo",
     "icu.funkye.easy.tx.integration.http", "icu.funkye.easy.tx.integration.feign", "icu.funkye.easy.tx.properties"})
-@EnableConfigurationProperties({RocketMqProperties.class})
+@EnableConfigurationProperties({RocketMqProperties.class, EasyTxProperties.class})
+@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true", matchIfMissing = true)
 @Configuration
 public class EasyTxAutoConfigure {
 
     @Autowired
     private RocketMqProperties prop;
+
+    @Autowired
+    private EasyTxProperties easyTxProperties;
 
     @Autowired
     private EasyMQConsumeMsgListenerProcessor consumeMsgListenerProcessor;

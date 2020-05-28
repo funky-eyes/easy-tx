@@ -2,6 +2,7 @@ package icu.funkye.easy.tx.integration.feign;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,7 +17,7 @@ import feign.Feign;
 /**
  * @author xiaojing
  */
-
+@ConditionalOnBean(name = {"easyTxProducer"})
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(Client.class)
 @AutoConfigureBefore(FeignAutoConfiguration.class)

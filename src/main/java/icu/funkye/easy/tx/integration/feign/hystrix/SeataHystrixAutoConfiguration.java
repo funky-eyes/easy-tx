@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package icu.funkye.easy.tx.integration.http.feign.hystrix;
+package icu.funkye.easy.tx.integration.feign.hystrix;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,7 @@ import com.netflix.hystrix.HystrixCommand;
 /**
  * @author xiaojing
  */
+@ConditionalOnBean(name = {"easyTxProducer"})
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(HystrixCommand.class)
 public class SeataHystrixAutoConfiguration {
