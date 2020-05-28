@@ -5,7 +5,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ConnectionFactory {
 
-    private static volatile  ConcurrentHashMap<String, List<ConnectionProxy>> concurrentHashMap=new ConcurrentHashMap<>();
+    private static volatile ConcurrentHashMap<String, List<ConnectionProxy>> concurrentHashMap =
+        new ConcurrentHashMap<>();
 
     public static ConcurrentHashMap<String, List<ConnectionProxy>> getConcurrentHashMap() {
         return concurrentHashMap;
