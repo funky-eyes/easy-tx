@@ -12,20 +12,21 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson.JSONObject;
 
 import icu.funkye.easy.tx.config.RootContext;
+import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.properties.RocketMqProperties;
 
 /**
  * @author chenjianbin
  * @version 1.0.0
  */
-@ConditionalOnBean(name = {"easyTxProducer"})
+@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true", matchIfMissing = true)
 @Order(value = 100)
 @Aspect
 @Component

@@ -6,10 +6,12 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import icu.funkye.easy.tx.config.RootContext;
+import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.proxy.ConnectionFactory;
 import icu.funkye.easy.tx.proxy.ConnectionProxy;
 
@@ -20,7 +22,9 @@ import icu.funkye.easy.tx.proxy.ConnectionProxy;
  * @version 1.0.0
  */
 
-@ConditionalOnBean(name = {"easyTxConsumer"})
+@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true",
+    matchIfMissing = true)
+@DependsOn({"connectionProxy"})
 @Aspect
 @Component
 public class DataSourceAspect {

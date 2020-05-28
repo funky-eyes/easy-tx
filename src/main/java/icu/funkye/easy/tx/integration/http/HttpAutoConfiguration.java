@@ -17,7 +17,7 @@ package icu.funkye.easy.tx.integration.http;
 
 import java.util.List;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.format.FormatterRegistry;
 import org.springframework.http.converter.HttpMessageConverter;
@@ -37,12 +37,14 @@ import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewResolverRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import icu.funkye.easy.tx.properties.EasyTxProperties;
+
 /**
  * Auto bean add for spring context if in springboot env.
  *
  * @author wangxb
  */
-@ConditionalOnBean(name = {"easyTxProducer"})
+@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true", matchIfMissing = true)
 @Configuration
 public class HttpAutoConfiguration implements WebMvcConfigurer {
 

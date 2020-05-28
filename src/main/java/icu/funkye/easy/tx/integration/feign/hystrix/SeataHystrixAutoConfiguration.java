@@ -16,17 +16,19 @@
 
 package icu.funkye.easy.tx.integration.feign.hystrix;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.netflix.hystrix.HystrixCommand;
 
+import icu.funkye.easy.tx.properties.EasyTxProperties;
+
 /**
  * @author xiaojing
  */
-@ConditionalOnBean(name = {"easyTxProducer"})
+@ConditionalOnProperty(prefix = EasyTxProperties.EASY_TX_PREFIX, name = {"enable"}, havingValue = "true", matchIfMissing = true)
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(HystrixCommand.class)
 public class SeataHystrixAutoConfiguration {
