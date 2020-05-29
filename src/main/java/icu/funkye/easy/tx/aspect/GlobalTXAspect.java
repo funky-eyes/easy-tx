@@ -50,7 +50,7 @@ public class GlobalTXAspect {
             sponsor = true;
             RootContext.bind(xid);
         }
-        Object o = null;
+        Object o;
         JSONObject object = new JSONObject();
         object.put(RootContext.KEY_XID, RootContext.getXID());
         try {

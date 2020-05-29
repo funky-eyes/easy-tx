@@ -3,6 +3,9 @@ package icu.funkye.easy.tx.proxy;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * @author 陈健斌
+ */
 public class ConnectionFactory {
 
     private static volatile ConcurrentHashMap<String, List<ConnectionProxy>> concurrentHashMap =

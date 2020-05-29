@@ -31,17 +31,19 @@ public class EasyMQConsumeMsgListenerProcessor implements MessageListenerConcurr
     public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgList,
         ConsumeConcurrentlyContext consumeConcurrentlyContext) {
         if (CollectionUtils.isEmpty(msgList)) {
-            LOGGER.info("MQ接收消息为空，直接返回成功");
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("MQ接收消息为空，直接返回成功");
+            }
             return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
         }
         MessageExt messageExt = msgList.get(0);
         try {
-            String topic = messageExt.getTopic();
-            String tags = messageExt.getTags();
             String body = new String(messageExt.getBody(), "utf-8");
             JSONObject object = JSONObject.parseObject(body);
             String xid = object.get(RootContext.KEY_XID).toString();
-            LOGGER.info("MQ消息topic={}, tags={}, 消息内容={}", topic, tags, body);
+            if (LOGGER.isInfoEnabled()) {
+                LOGGER.info("MQ消息内容={}", body);
+            }
             List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(xid);
             if (list != null) {
                 try {
@@ -54,7 +56,9 @@ public class EasyMQConsumeMsgListenerProcessor implements MessageListenerConcurr
                 }
             }
         } catch (Exception e) {
-            LOGGER.error("获取MQ消息内容异常{}", e);
+            if (LOGGER.isErrorEnabled()) {
+                LOGGER.error("获取MQ消息内容异常{}", e);
+            }
         }
         return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
     }
