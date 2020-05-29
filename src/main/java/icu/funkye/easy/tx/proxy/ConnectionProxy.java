@@ -20,19 +20,20 @@ import java.util.Properties;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 /**
  * @author 陈健斌
  */
+@Component
+@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class ConnectionProxy implements Connection {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionProxy.class);
 
     private Connection connection;
-
-    public ConnectionProxy(Connection connection) {
-        this.connection = connection;
-    }
 
     public void notify(int state) {
         try {

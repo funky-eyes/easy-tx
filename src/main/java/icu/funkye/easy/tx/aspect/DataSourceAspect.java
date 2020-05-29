@@ -11,6 +11,8 @@ import icu.funkye.easy.tx.proxy.ConnectionProxy;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -26,11 +28,15 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 public class DataSourceAspect {
+    @Autowired
+    ObjectFactory<ConnectionProxy> bean;
+
     ReentrantLock lock = new ReentrantLock();
 
     @Around("execution(* javax.sql.DataSource.getConnection(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
-        ConnectionProxy connectionProxy = new ConnectionProxy((Connection)joinPoint.proceed());
+        ConnectionProxy connectionProxy = bean.getObject();
+        connectionProxy.setConnection((Connection)joinPoint.proceed());
         lock.lock();
         try {
             List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(RootContext.getXID());
