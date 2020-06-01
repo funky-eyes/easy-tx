@@ -15,3 +15,24 @@ wait conn 等待发起方获取全局事务状态后,发送全局事务状态到
 本项目仅支持spring cloud的xid传递,dubbo后续会集成.
 
 [使用示例](https://github.com/a364176773/spring-cloud-demo-easy-tx )
+
+```yaml
+easy:
+  tx:
+    enable: true
+    rocket:
+      name-server: 127.0.0.1:9876
+      group: test-group
+      topic: test
+```
+
+引入依赖:
+
+```
+            <dependency>
+                <groupId>icu.funkye</groupId>
+                <artifactId>easy-tx</artifactId>
+                <version>0.1</version>
+            </dependency>
+```
+

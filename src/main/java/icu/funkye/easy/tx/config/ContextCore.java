@@ -7,8 +7,10 @@ public interface ContextCore {
     /**
      * Put string.
      *
-     * @param key   the key
-     * @param value the value
+     * @param key
+     *            the key
+     * @param value
+     *            the value
      * @return the string
      */
     String put(String key, String value);
@@ -16,7 +18,8 @@ public interface ContextCore {
     /**
      * Get string.
      *
-     * @param key the key
+     * @param key
+     *            the key
      * @return the string
      */
     String get(String key);
@@ -24,7 +27,8 @@ public interface ContextCore {
     /**
      * Remove string.
      *
-     * @param key the key
+     * @param key
+     *            the key
      * @return the string
      */
     String remove(String key);
@@ -32,7 +36,7 @@ public interface ContextCore {
     /**
      * entries
      *
-     * @return
+     * @return entries
      */
     Map<String, String> entries();
 }
