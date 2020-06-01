@@ -8,6 +8,7 @@ import icu.funkye.easy.tx.config.RootContext;
 import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.proxy.ConnectionFactory;
 import icu.funkye.easy.tx.proxy.ConnectionProxy;
+import org.apache.commons.lang3.StringUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -35,20 +36,24 @@ public class DataSourceAspect {
 
     @Around("execution(* javax.sql.DataSource.getConnection(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
-        ConnectionProxy connectionProxy = bean.getObject();
-        connectionProxy.setConnection((Connection)joinPoint.proceed());
-        lock.lock();
-        try {
-            List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(RootContext.getXID());
-            if (list == null) {
-                list = new ArrayList<>();
+        Connection conn = (Connection)joinPoint.proceed();
+        if (StringUtils.isNotBlank(RootContext.getXID())) {
+            ConnectionProxy connectionProxy = bean.getObject();
+            connectionProxy.setConnection(conn);
+            lock.lock();
+            try {
+                List<ConnectionProxy> list = ConnectionFactory.getConcurrentHashMap().get(RootContext.getXID());
+                if (list == null) {
+                    list = new ArrayList<>();
+                }
+                list.add(connectionProxy);
+                ConnectionFactory.getConcurrentHashMap().put(RootContext.getXID(), list);
+            } finally {
+                lock.unlock();
             }
-            list.add(connectionProxy);
-            ConnectionFactory.getConcurrentHashMap().put(RootContext.getXID(), list);
-        } finally {
-            lock.unlock();
+            return connectionProxy;
         }
-        return connectionProxy;
+        return conn;
     }
 
 }
