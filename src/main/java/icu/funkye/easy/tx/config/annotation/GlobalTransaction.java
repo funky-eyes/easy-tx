@@ -19,6 +19,8 @@ public @interface GlobalTransaction {
 
     EasyTxMode mode() default EasyTxMode.EASY ;
 
+    long timeout() default 5000;
+
     /**
      * 是否重试
      */

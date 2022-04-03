@@ -19,7 +19,7 @@ public class SagaBranchTransaction {
 
     String confirm;
 
-    String confirmBeanName;
+    Class<?> confirmBeanName;
 
     Object[] args;
 
@@ -101,11 +101,11 @@ public class SagaBranchTransaction {
         this.confirm = confirm;
     }
 
-    public String getConfirmBeanName() {
+    public Class<?> getConfirmBeanName() {
         return confirmBeanName;
     }
 
-    public void setConfirmBeanName(String confirmBeanName) {
+    public void setConfirmBeanName(Class<?> confirmBeanName) {
         this.confirmBeanName = confirmBeanName;
     }
 

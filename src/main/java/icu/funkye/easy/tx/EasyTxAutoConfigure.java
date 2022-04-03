@@ -1,26 +1,19 @@
 package icu.funkye.easy.tx;
 
 import java.time.Duration;
-import icu.funkye.easy.tx.listener.EasyMQConsumeMsgListenerProcessor;
 import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.properties.RocketMqProperties;
-import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
-import org.apache.rocketmq.client.exception.MQClientException;
-import org.apache.rocketmq.client.producer.DefaultMQProducer;
-import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
-import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisClientConfiguration;
@@ -41,73 +34,37 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class EasyTxAutoConfigure {
 
-    @Autowired
-    private RocketMqProperties prop;
-
     private static final Logger LOGGER = LoggerFactory.getLogger(EasyTxAutoConfigure.class);
 
-    @ConditionalOnExpression("#{easyTxProperties.getOnlyUseMode().contains('easy')}")
-    @Bean
-    public EasyMQConsumeMsgListenerProcessor easyMQConsumeMsgListenerProcessor() {
-        return new EasyMQConsumeMsgListenerProcessor();
+    @Autowired
+    private RedisProperties redisProperties;
+
+    @Bean(name = "jedisEasyTxConnectionFactory")
+    public JedisConnectionFactory jedisEasyTxConnectionFactory() {
+        RedisStandaloneConfiguration redisStandaloneConfiguration = new RedisStandaloneConfiguration();
+        redisStandaloneConfiguration
+            .setHostName(null == redisProperties.getHost() || redisProperties.getHost().length() <= 0 ? "127.0.0.1"
+                : redisProperties.getHost());
+        redisStandaloneConfiguration.setPort(redisProperties.getPort() <= 0 ? 6379 : redisProperties.getPort());
+        redisStandaloneConfiguration
+            .setDatabase(redisProperties.getDatabase() <= 0 ? 0 : redisProperties.getDatabase());
+        if (redisProperties.getPassword() != null && redisProperties.getPassword().length() > 0) {
+            redisStandaloneConfiguration.setPassword(RedisPassword.of(redisProperties.getPassword()));
+        }
+        JedisClientConfiguration.JedisClientConfigurationBuilder jedisClientConfiguration =
+            JedisClientConfiguration.builder();
+        jedisClientConfiguration.connectTimeout(redisProperties.getTimeout());// connection
+        // timeout
+        JedisConnectionFactory factory =
+            new JedisConnectionFactory(redisStandaloneConfiguration, jedisClientConfiguration.build());
+        return factory;
     }
 
-    @ConditionalOnExpression("#{easyTxProperties.getOnlyUseMode().contains('easy')}")
-    @Bean
-    public DefaultMQProducer easyTxProducer() throws MQClientException {
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("easyTxProducer is creating");
-        }
-        DefaultMQProducer producer = new DefaultMQProducer(prop.getGroup());
-        producer.setNamesrvAddr(prop.getNameServer());
-        producer.setVipChannelEnabled(false);
-        producer.start();
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("rocketmq producer server open the success");
-        }
-        return producer;
-    }
-
-    @ConditionalOnExpression("#{easyTxProperties.getOnlyUseMode().contains('easy')}")
-    @Bean
-    public DefaultMQPushConsumer easyTxConsumer(EasyMQConsumeMsgListenerProcessor easyMQConsumeMsgListenerProcessor)
-        throws MQClientException {
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("easyTxConsumer is creating");
-        }
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer(prop.getGroup());
-        consumer.setNamesrvAddr(prop.getNameServer());
-        // 设置监听
-        consumer.registerMessageListener(easyMQConsumeMsgListenerProcessor);
-        /**
-         * 设置consumer第一次启动是从队列头部开始还是队列尾部开始 如果不是第一次启动，那么按照上次消费的位置继续消费
-         */
-        consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_LAST_OFFSET);
-        /**
-         * 设置消费模型，集群还是广播，默认为集群
-         */
-        consumer.setMessageModel(MessageModel.BROADCASTING);
-        try {
-            consumer.setVipChannelEnabled(false);
-            consumer.subscribe(prop.getTopic(), "*");
-            consumer.start();
-            if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("consumer creating a successful groupName={}, topics={}, namesrvAddr={}", prop.getGroup(),
-                    prop.getTopic(), prop.getNameServer());
-            }
-        } catch (MQClientException e) {
-            if (LOGGER.isErrorEnabled()) {
-                LOGGER.error("consumer create a failure! error: {}", e.getMessage());
-            }
-        }
-        return consumer;
-    }
-
-    @ConditionalOnExpression("#{easyTxProperties.getOnlyUseMode().contains('saga')}")
     @Bean("redisEasyTxTemplate")
-    public RedisTemplate<String, Object> redisEasyTxTemplate(JedisConnectionFactory jedisConnectionFactory) {
+    public RedisTemplate<String, Object> redisEasyTxTemplate(JedisConnectionFactory jedisEasyTxConnectionFactory) {
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
-        redisTemplate.setConnectionFactory(jedisConnectionFactory);
+        redisTemplate.setConnectionFactory(jedisEasyTxConnectionFactory);
+        redisTemplate.setEnableTransactionSupport(true);
         redisTemplate.setKeySerializer(new StringRedisSerializer());
         redisTemplate.setHashKeySerializer(redisTemplate.getKeySerializer());
         redisTemplate.setValueSerializer(new JdkSerializationRedisSerializer());

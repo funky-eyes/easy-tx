@@ -5,11 +5,13 @@ import java.util.List;
 import icu.funkye.easy.tx.config.EasyTxMode;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
 /**
  * @author 陈健斌
  */
 @ConfigurationProperties(prefix = EasyTxProperties.EASY_TX_PREFIX)
+@Component
 public class EasyTxProperties {
 
     public static final String EASY_TX_PREFIX = "easy.tx";
