@@ -43,15 +43,20 @@ public class ApacheDubboTransactionPropagationFilter implements Filter {
         String xid = RootContext.getXID();
 
         String rpcXid = getRpcXid();
+        String rpcRetry = getRpcXid();
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("xid in RootContext[{}] xid in RpcContext[{}]", xid, rpcXid);
         }
         boolean bind = false;
         if (xid != null) {
             RpcContext.getContext().setAttachment(RootContext.KEY_XID, xid);
+            RpcContext.getContext().setAttachment(RootContext.TX_RETRY, RootContext.getRetry());
         } else {
             if (rpcXid != null) {
                 RootContext.bind(rpcXid);
+                if(rpcRetry!=null) {
+                    RootContext.bind(rpcXid);
+                }
                 bind = true;
             }
         }
@@ -80,6 +85,18 @@ public class ApacheDubboTransactionPropagationFilter implements Filter {
             rpcXid = RpcContext.getContext().getAttachment(RootContext.KEY_XID.toLowerCase());
         }
         return rpcXid;
+    }
+
+    /**
+     * get rpc retry
+     * @return
+     */
+    private String getRpcRetry() {
+        String retry = RpcContext.getContext().getAttachment(RootContext.TX_RETRY);
+        if (retry == null) {
+            retry = RpcContext.getContext().getAttachment(RootContext.TX_RETRY.toLowerCase());
+        }
+        return retry;
     }
 
 }

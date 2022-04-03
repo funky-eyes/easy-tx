@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 /**
  * @author 陈健斌 funkye
  */
-@Component
 public class EasyMQConsumeMsgListenerProcessor implements MessageListenerConcurrently {
+
     public static final Logger LOGGER = LoggerFactory.getLogger(EasyMQConsumeMsgListenerProcessor.class);
 
     /**
@@ -48,9 +48,7 @@ public class EasyMQConsumeMsgListenerProcessor implements MessageListenerConcurr
             if (list != null) {
                 try {
                     Integer status = Integer.valueOf(object.get(RootContext.XID_STATUS).toString());
-                    list.forEach(i -> {
-                        i.notify(status);
-                    });
+                    list.forEach(i -> i.notify(status));
                 } finally {
                     ConnectionFactory.getConcurrentHashMap().remove(xid);
                 }

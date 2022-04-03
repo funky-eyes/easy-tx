@@ -6,22 +6,31 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.UUID;
-import icu.funkye.easy.tx.config.EasyTxMode;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 @Documented
-public @interface GlobalTransaction {
-
-    String name() default "";
-
-    EasyTxMode mode() default EasyTxMode.EASY ;
+public @interface SagaTransaction {
 
     /**
-     * 是否重试
+     * 提交方法
      */
-    boolean retry() default false;
+    String confirm();
+
+    /**
+     * 失败补偿的bean
+     */
+    Class<?> clazz();
+
+    /**
+     * 失败补偿的方法
+     */
+    String cancel() default "";
+
+    /**
+     * 10s 重试一次
+     */
+    int retryInterval() default 10000;
 
 }

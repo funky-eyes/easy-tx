@@ -131,12 +131,15 @@ public class SeataHystrixConcurrencyStrategy extends HystrixConcurrencyStrategy 
 
 		private final String xid;
 
+		private final String retry;
+
 		private final RequestAttributes requestAttributes;
 
 		SeataContextCallable(Callable<K> actual, RequestAttributes requestAttribute) {
 			this.actual = actual;
 			this.requestAttributes = requestAttribute;
 			this.xid = RootContext.getXID();
+			this.retry = RootContext.getRetry();
 		}
 
 		@Override
@@ -144,6 +147,7 @@ public class SeataHystrixConcurrencyStrategy extends HystrixConcurrencyStrategy 
 			try {
 				RequestContextHolder.setRequestAttributes(requestAttributes);
 				RootContext.bind(xid);
+				RootContext.bind(retry);
 				return actual.call();
 			} finally {
 				RootContext.unbind();
