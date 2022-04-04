@@ -1,15 +1,17 @@
 package icu.funkye.easy.tx.config;
 
-import icu.funkye.easy.tx.config.annotation.GlobalTransaction;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * @author
+ */
 public class RootContext {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RootContext.class);
 
-    private static ContextCore CONTEXT_HOLDER = new ThreadLocalContextCore();
+    private static final ContextCore CONTEXT_HOLDER = new ThreadLocalContextCore();
 
     /**
      * The constant KEY_XID.
@@ -27,6 +29,8 @@ public class RootContext {
     public static final String TX_MODE = "TX_MODE";
 
     public static final String TX_RETRY = "TX_RETRY";
+
+    public static final String TX_RETRY_THREAD = "TX_RETRY_THREAD";
 
     /**
      * Gets xid.
@@ -85,8 +89,20 @@ public class RootContext {
         CONTEXT_HOLDER.put(TX_RETRY, retry);
     }
 
+    /**
+     * Bind.
+     *
+     */
+    public static void bindRetryThread() {
+        CONTEXT_HOLDER.put(TX_RETRY_THREAD, "true");
+    }
+
     public static boolean isSaga() {
         return StringUtils.equalsIgnoreCase(CONTEXT_HOLDER.get(TX_MODE), EasyTxMode.SAGA.mode());
+    }
+
+    public static boolean isRetryThread() {
+        return StringUtils.equalsIgnoreCase(CONTEXT_HOLDER.get(TX_RETRY_THREAD), "true");
     }
 
     /**
@@ -101,6 +117,7 @@ public class RootContext {
         }
         CONTEXT_HOLDER.remove(TX_RETRY);
         CONTEXT_HOLDER.remove(TX_MODE);
+        CONTEXT_HOLDER.remove(TX_RETRY_THREAD);
         return xid;
     }
 }

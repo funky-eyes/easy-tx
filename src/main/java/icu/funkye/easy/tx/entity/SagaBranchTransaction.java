@@ -1,6 +1,8 @@
 package icu.funkye.easy.tx.entity;
 
+import java.util.Arrays;
 import java.util.Date;
+import java.util.Objects;
 import icu.funkye.easy.tx.config.EasyTxMode;
 
 public class SagaBranchTransaction {
@@ -19,11 +21,17 @@ public class SagaBranchTransaction {
 
     String confirm;
 
+    String cancel;
+
     Class<?> confirmBeanName;
+
+    Class<?> cancelBeanName;
 
     Object[] args;
 
     Class<?>[] parameterTypes;
+
+    Object result;
 
     Date createTime = new Date();
 
@@ -123,6 +131,56 @@ public class SagaBranchTransaction {
 
     public void setParameterTypes(Class<?>[] parameterTypes) {
         this.parameterTypes = parameterTypes;
+    }
+
+    public Class<?> getCancelBeanName() {
+        return cancelBeanName;
+    }
+
+    public void setCancelBeanName(Class<?> cancelBeanName) {
+        this.cancelBeanName = cancelBeanName;
+    }
+
+    public String getCancel() {
+        return cancel;
+    }
+
+    public void setCancel(String cancel) {
+        this.cancel = cancel;
+    }
+
+    public Object getResult() {
+        return result;
+    }
+
+    public void setResult(Object result) {
+        this.result = result;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        SagaBranchTransaction that = (SagaBranchTransaction)o;
+        return Objects.equals(xid, that.xid) && Objects.equals(mode, that.mode)
+            && Objects.equals(clientId, that.clientId) && Objects.equals(retryInterval, that.retryInterval)
+            && Objects.equals(confirm, that.confirm) && Objects.equals(cancel, that.cancel)
+            && Objects.equals(confirmBeanName, that.confirmBeanName)
+            && Objects.equals(cancelBeanName, that.cancelBeanName) && Arrays.equals(args, that.args)
+            && Arrays.equals(parameterTypes, that.parameterTypes);
+    }
+
+    @Override
+    public int hashCode() {
+        int result1 =
+            Objects.hash(xid, mode, clientId, retryInterval, confirm, cancel, confirmBeanName, cancelBeanName);
+        result1 = 31 * result1 + Arrays.hashCode(args);
+        result1 = 31 * result1 + Arrays.hashCode(parameterTypes);
+        return result1;
     }
 
 }

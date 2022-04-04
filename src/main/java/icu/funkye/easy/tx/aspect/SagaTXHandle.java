@@ -12,10 +12,13 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import icu.funkye.easy.tx.config.EasyTxMode;
+import icu.funkye.easy.tx.config.SagaContext;
+import icu.funkye.easy.tx.entity.GlobalTransactionDO;
 import icu.funkye.easy.tx.util.SpringProxyUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -87,7 +90,6 @@ public class SagaTXHandle implements ApplicationContextAware {
                         try (Jedis jedis = jedisEasyTxPool.getResource()) {
                             Map<String, String> branchs = jedis.hgetAll(key);
                             if (!branchs.isEmpty()) {
-                                Map<String, Map<String, String>> globalTXs = new ConcurrentHashMap<>();
                                 // 排序
                                 List<SagaBranchTransaction> branchList = branchs.values().parallelStream()
                                     .map(i -> JSONObject.parseObject(i, SagaBranchTransaction.class))
@@ -98,10 +100,13 @@ public class SagaTXHandle implements ApplicationContextAware {
                                         logger.debug("开始补偿SAGA事务: {}", key);
                                     }
                                     String txKey = PREFIX_TX + branchTransaction.getXid();
-                                    Map<String, String> globalTX = globalTXs.computeIfAbsent(branchTransaction.getXid(),
-                                        k -> jedis.hgetAll(txKey));
-                                    boolean status = Boolean.parseBoolean(globalTX.get("status"));
-                                    if (!status) {
+                                    String txStr = jedis.get(txKey);
+                                    if (StringUtils.isBlank(txStr)) {
+                                        continue;
+                                    }
+                                    GlobalTransactionDO globalTransactionDO =
+                                        JSONObject.parseObject(txStr, GlobalTransactionDO.class);
+                                    if (globalTransactionDO.getStatus() != null && !globalTransactionDO.getStatus()) {
                                         // 只补偿自身
                                         if (branchTransaction.getClientId()
                                             .equalsIgnoreCase(easyTxProperties.getClientId())) {
@@ -113,54 +118,30 @@ public class SagaTXHandle implements ApplicationContextAware {
                                                 // 抢到锁,得到此事务的补偿权利
                                                 if (result) {
                                                     // 分支状态为false进行补偿
-                                                    if (!branchTransaction.isStatus()) {
-                                                        // 判断分支事务是否已经超时
-                                                        if (System.currentTimeMillis()
-                                                            - branchTransaction.getModifyTime()
-                                                                .getTime() > branchTransaction.getRetryInterval()) {
-                                                            try {
-                                                                // 获取confirm的bean
-                                                                Object confirmBean = applicationContext
-                                                                    .getBean(branchTransaction.getConfirmBeanName());
-                                                                Method confirmMethod = SpringProxyUtils
-                                                                    .findTargetClass(applicationContext.getBean(
-                                                                        branchTransaction.getConfirmBeanName()))
-                                                                    .getMethod(branchTransaction.getConfirm(),
-                                                                        branchTransaction.getParameterTypes());
-                                                                // 读取注解进行相应补偿行为
-                                                                SagaTransaction sagaTransaction =
-                                                                    confirmMethod.getAnnotation(SagaTransaction.class);
-                                                                boolean retry =
-                                                                    Boolean.parseBoolean(globalTX.get("retry"));
-                                                                if (retry) {
-                                                                    // 重试confirm
-                                                                    confirmMethod.invoke(confirmBean,
-                                                                        branchTransaction.getArgs());
-                                                                    if (logger.isDebugEnabled()) {
-                                                                        logger.debug("重试SAGA分支事务: {},成功",
-                                                                            branchTransaction.getBranchId());
-                                                                    }
-                                                                } else {
-                                                                    // 反向补偿
-                                                                    Object cancelBean = applicationContext
-                                                                        .getBean(sagaTransaction.clazz());
-                                                                    Method cancelMethod =
-                                                                        SpringProxyUtils.findTargetClass(cancelBean)
-                                                                            .getMethod(sagaTransaction.cancel(),
-                                                                                branchTransaction.getParameterTypes());
-                                                                    cancelMethod.invoke(cancelBean,
-                                                                        branchTransaction.getArgs());
-                                                                    if (logger.isDebugEnabled()) {
-                                                                        logger.debug("补偿SAGA分支事务: {},成功",
-                                                                            branchTransaction.getBranchId());
-                                                                    }
+                                                    if (!branchTransaction.isStatus()
+                                                        && !globalTransactionDO.getStatus()) {
+                                                        try {
+                                                            boolean retry = globalTransactionDO.getRetry();
+                                                            // 当globaltx决议为回滚时,需要所有已成功的分支进行反向补偿
+                                                            if (!retry) {
+                                                                Object cancelBean = applicationContext
+                                                                    .getBean(branchTransaction.getCancelBeanName());
+                                                                Method cancelMethod =
+                                                                    SpringProxyUtils.findTargetClass(cancelBean)
+                                                                        .getMethod(branchTransaction.getCancel(),
+                                                                            branchTransaction.getParameterTypes());
+                                                                cancelMethod.invoke(cancelBean,
+                                                                    branchTransaction.getArgs());
+                                                                if (logger.isDebugEnabled()) {
+                                                                    logger.debug("补偿SAGA分支事务: {},成功",
+                                                                        branchTransaction.getBranchId());
                                                                 }
                                                                 // 如无异常删除此分支事务即可
                                                                 jedis.hdel(key, branchTransaction.getBranchId());
-                                                            } catch (Exception e) {
-                                                                logger.error("恢复saga事务出现异常,请反馈至github issue: {}",
-                                                                    branchTransaction.getBranchId());
                                                             }
+                                                        } catch (Exception e) {
+                                                            logger.error("恢复saga事务出现异常: {}",
+                                                                branchTransaction.getBranchId(), e);
                                                         }
                                                     }
                                                 }
@@ -173,12 +154,6 @@ public class SagaTXHandle implements ApplicationContextAware {
                                                 }
                                             }
                                         }
-                                    } else {
-                                        try (Pipeline pipeline = jedis.pipelined()) {
-                                            pipeline.del(key);
-                                            pipeline.del(txKey);
-                                        }
-                                        break;
                                     }
                                 }
                             }
@@ -197,10 +172,10 @@ public class SagaTXHandle implements ApplicationContextAware {
 
     @Around("annotationPoinCut()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        String xid = RootContext.getXID();
+        Object o = null;
         MethodSignature joinPointObject = (MethodSignature)joinPoint.getSignature();
         Method method = joinPointObject.getMethod();
-        Object o;
-        String xid = RootContext.getXID();
         SagaTransaction sagaTransaction = method.getAnnotation(SagaTransaction.class);
         // 业务开始之前先记录SAGA分支事务
         SagaBranchTransaction branchTransaction = new SagaBranchTransaction();
@@ -209,13 +184,37 @@ public class SagaTXHandle implements ApplicationContextAware {
         branchTransaction.setBranchId(UUID.randomUUID().toString());
         branchTransaction.setConfirm(
             StringUtils.isNoneBlank(sagaTransaction.confirm()) ? sagaTransaction.confirm() : method.getName());
+        branchTransaction
+            .setCancelBeanName(sagaTransaction.clazz() != null ? sagaTransaction.clazz() : method.getDeclaringClass());
         branchTransaction.setRetryInterval(sagaTransaction.retryInterval());
         branchTransaction.setConfirmBeanName(method.getDeclaringClass());
         branchTransaction.setArgs(joinPoint.getArgs());
+        branchTransaction.setCancel(sagaTransaction.cancel());
         branchTransaction.setParameterTypes(method.getParameterTypes());
         branchTransaction.setModifyTime(new Date());
         RootContext.bindMode(EasyTxMode.SAGA);
         String key = PREFIX_SAGA_TX + xid;
+        // 重试线程中补偿需要额外处理
+        if (RootContext.isRetryThread()) {
+            SagaBranchTransaction cacheBranch = SagaContext.getBranch(branchTransaction.hashCode());
+            if (cacheBranch != null) {
+                // 说明存在该分支事务
+                if (cacheBranch.getResult() != null) {
+                    // 说明该分支已经被处理过,只需要返回结果即可
+                    return cacheBranch.getResult();
+                } else {
+                    Object result = joinPoint.proceed();
+                    cacheBranch.setResult(result);
+                    // 缓存结果,避免再次重试时业务需要再走一遍业务处理
+                    try (Jedis jedis = jedisEasyTxPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
+                        pipeline.hset(key, branchTransaction.getBranchId(), JSONObject.toJSONString(branchTransaction));
+                        pipeline.expire(key, 24 * 60 * 60);
+                    }
+                    return result;
+                }
+            }
+        }
+        // 注册新分支
         try (Jedis jedis = jedisEasyTxPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
             pipeline.hset(key, branchTransaction.getBranchId(), JSONObject.toJSONString(branchTransaction));
             pipeline.expire(key, 24 * 60 * 60);
@@ -233,17 +232,15 @@ public class SagaTXHandle implements ApplicationContextAware {
             }
             // 如果不需要重试,那么进行反向补偿
             if (!Boolean.parseBoolean(RootContext.getRetry())) {
-                Object object = applicationContext.getBean(sagaTransaction.clazz());
-                if (object != null) {
+                try {
+                    Object object = applicationContext.getBean(sagaTransaction.clazz());
                     Method cancelMethod =
                         object.getClass().getMethod(sagaTransaction.cancel(), joinPointObject.getParameterTypes());
-                    try {
-                        o = cancelMethod.invoke(object, joinPoint.getArgs());
-                        success = Boolean.TRUE;
-                        return o;
-                    } catch (Exception exception) {
-                        throw new RuntimeException("将在异步中重试此分支", exception);
-                    }
+                    o = cancelMethod.invoke(object, joinPoint.getArgs());
+                    success = Boolean.TRUE;
+                    return o;
+                } catch (Exception exception) {
+                    throw new RuntimeException("将在异步中重试此分支", exception);
                 }
             }
             throw new RuntimeException("将在异步中重试此分支", e);
@@ -251,6 +248,9 @@ public class SagaTXHandle implements ApplicationContextAware {
             // 记录SAGA分支事务
             branchTransaction.setModifyTime(new Date());
             branchTransaction.setStatus(success);
+            if (success) {
+                branchTransaction.setResult(o);
+            }
             try (Jedis jedis = jedisEasyTxPool.getResource()) {
                 jedis.hset(key, branchTransaction.getBranchId(), JSONObject.toJSONString(branchTransaction));
             }
@@ -260,6 +260,16 @@ public class SagaTXHandle implements ApplicationContextAware {
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            executor.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            logger.error(e.getMessage(), e);
+        }
     }
 
 }
