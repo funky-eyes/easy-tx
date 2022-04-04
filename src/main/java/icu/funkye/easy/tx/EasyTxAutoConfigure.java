@@ -1,6 +1,9 @@
 package icu.funkye.easy.tx;
 
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
+import javax.annotation.Resource;
 import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.properties.RocketMqProperties;
 import org.slf4j.Logger;
@@ -21,6 +24,8 @@ import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 
 /**
  * @author 陈健斌 funkye
@@ -36,40 +41,16 @@ public class EasyTxAutoConfigure {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EasyTxAutoConfigure.class);
 
-    @Autowired
-    private RedisProperties redisProperties;
-
-    @Bean(name = "jedisEasyTxConnectionFactory")
-    public JedisConnectionFactory jedisEasyTxConnectionFactory() {
-        RedisStandaloneConfiguration redisStandaloneConfiguration = new RedisStandaloneConfiguration();
-        redisStandaloneConfiguration
-            .setHostName(null == redisProperties.getHost() || redisProperties.getHost().length() <= 0 ? "127.0.0.1"
-                : redisProperties.getHost());
-        redisStandaloneConfiguration.setPort(redisProperties.getPort() <= 0 ? 6379 : redisProperties.getPort());
-        redisStandaloneConfiguration
-            .setDatabase(redisProperties.getDatabase() <= 0 ? 0 : redisProperties.getDatabase());
-        if (redisProperties.getPassword() != null && redisProperties.getPassword().length() > 0) {
-            redisStandaloneConfiguration.setPassword(RedisPassword.of(redisProperties.getPassword()));
-        }
-        JedisClientConfiguration.JedisClientConfigurationBuilder jedisClientConfiguration =
-            JedisClientConfiguration.builder();
-        jedisClientConfiguration.connectTimeout(redisProperties.getTimeout());// connection
-        // timeout
-        JedisConnectionFactory factory =
-            new JedisConnectionFactory(redisStandaloneConfiguration, jedisClientConfiguration.build());
-        return factory;
-    }
-
-    @Bean("redisEasyTxTemplate")
-    public RedisTemplate<String, Object> redisEasyTxTemplate(JedisConnectionFactory jedisEasyTxConnectionFactory) {
-        RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
-        redisTemplate.setConnectionFactory(jedisEasyTxConnectionFactory);
-        redisTemplate.setEnableTransactionSupport(true);
-        redisTemplate.setKeySerializer(new StringRedisSerializer());
-        redisTemplate.setHashKeySerializer(redisTemplate.getKeySerializer());
-        redisTemplate.setValueSerializer(new JdkSerializationRedisSerializer());
-        redisTemplate.afterPropertiesSet();
-        return redisTemplate;
+    @ConditionalOnClass(name = "org.springframework.boot.autoconfigure.data.redis.RedisProperties")
+    @Bean("jedisEasyTxPool")
+    public JedisPool jedisEasyTxPool(RedisProperties redisProperties) {
+        JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
+        jedisPoolConfig.setMinIdle(10);
+        jedisPoolConfig.setMaxIdle(30);
+        jedisPoolConfig.setMaxTotal(30);
+        JedisPool jedisPool = new JedisPool(jedisPoolConfig, redisProperties.getHost(), redisProperties.getPort(),
+            60000, redisProperties.getPassword(), 10);
+        return jedisPool;
     }
 
 }

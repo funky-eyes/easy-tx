@@ -1,9 +1,13 @@
 package icu.funkye.easy.tx.aspect;
 
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Resource;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import icu.funkye.easy.tx.config.annotation.GlobalTransaction;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
@@ -17,7 +21,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson.JSONObject;
@@ -25,9 +28,13 @@ import com.alibaba.fastjson.JSONObject;
 import icu.funkye.easy.tx.config.RootContext;
 import icu.funkye.easy.tx.properties.EasyTxProperties;
 import icu.funkye.easy.tx.properties.RocketMqProperties;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.params.SetParams;
 
-
-import static icu.funkye.easy.tx.aspect.SagaTXHandle.PIX_TX;
+import static icu.funkye.easy.tx.constant.EasyTxConstant.PREFIX_TX;
 
 /**
  * @author chenjianbin
@@ -47,12 +54,51 @@ public class GlobalTXAspect {
     private DefaultMQProducer easyTxProducer;
 
     @Resource
-    RedisTemplate<String, Object> redisEasyTxTemplate;
+    JedisPool jedisEasyTxPool;
+
+    ThreadFactoryBuilder threadFactoryBuilder =
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("easy-tx-pool-%d");
+
+    ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, threadFactoryBuilder.build());
+
+    public GlobalTXAspect() {
+        executor.scheduleAtFixedRate(() -> {
+            try (Jedis jedis = jedisEasyTxPool.getResource()) {
+                String key = PREFIX_TX + "LOCK";
+                String owner = UUID.randomUUID().toString();
+                boolean result =
+                    StringUtils.equalsIgnoreCase(jedis.set(key, owner, SetParams.setParams().nx().ex(60)), "OK");
+                if (result) {
+                    try {
+                        Set<String> txs = jedis.keys(PREFIX_TX + "*");
+                        for (String tx : txs) {
+                            Response<String> createTimeResponse;
+                            Response<String> tiemoutResponse;
+                            try (Pipeline pipeline = jedis.pipelined()) {
+                                createTimeResponse = pipeline.hget(tx, "createTime");
+                                tiemoutResponse = pipeline.hget(tx, "timeout");
+                            }
+                            long createTime = Long.parseLong(createTimeResponse.get());
+                            long timeout = Long.parseLong(tiemoutResponse.get());
+                            if (System.currentTimeMillis() - createTime > timeout) {
+                                jedis.hset(tx, "status", String.valueOf(Boolean.FALSE));
+                            }
+                        }
+                    } finally {
+                        String currentOwner = jedis.get(key);
+                        if (StringUtils.equalsIgnoreCase(currentOwner, owner)) {
+                            jedis.del(key);
+                        }
+                    }
+                }
+            }
+        }, 10, 1, TimeUnit.SECONDS);
+    }
 
     @Pointcut("@annotation(icu.funkye.easy.tx.config.annotation.GlobalTransaction)")
-    public void annotationPoinCut() {}
+    public void annotationPointCut() {}
 
-    @Around("annotationPoinCut()")
+    @Around("annotationPointCut()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature joinPointObject = (MethodSignature)joinPoint.getSignature();
         Method method = joinPointObject.getMethod();
@@ -68,24 +114,26 @@ public class GlobalTXAspect {
         }
         JSONObject object = new JSONObject();
         object.put(RootContext.KEY_XID, RootContext.getXID());
-        String txKey = PIX_TX + xid;
-        redisEasyTxTemplate.multi();
-        redisEasyTxTemplate.opsForHash().put(txKey, "retry", globalTransaction.retry());
-        redisEasyTxTemplate.opsForHash().put(txKey, "timeout", globalTransaction.timeout());
-        redisEasyTxTemplate.exec();
+        String txKey = PREFIX_TX + xid;
+        try (Jedis jedis = jedisEasyTxPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
+            pipeline.hset(txKey, "retry", String.valueOf(globalTransaction.retry()));
+            pipeline.hset(txKey, "timeout", String.valueOf(globalTransaction.timeout()));
+            pipeline.hset(txKey, "createTime", String.valueOf(System.currentTimeMillis()));
+            pipeline.expire(txKey, 24 * 60 * 60);
+        }
         try {
             o = joinPoint.proceed();
-            redisEasyTxTemplate.multi();
-            redisEasyTxTemplate.opsForHash().put(txKey, "status", Boolean.TRUE);
-            redisEasyTxTemplate.expire(txKey, 24, TimeUnit.HOURS);
-            redisEasyTxTemplate.exec();
+            try (Jedis jedis = jedisEasyTxPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
+                pipeline.hset(txKey, "status", String.valueOf(Boolean.TRUE));
+                pipeline.expire(txKey, 24 * 60 * 60);
+            }
             object.put(RootContext.XID_STATUS, 1);
         } catch (Throwable e) {
             object.put(RootContext.XID_STATUS, 0);
-            redisEasyTxTemplate.multi();
-            redisEasyTxTemplate.opsForHash().put(txKey, "status", Boolean.FALSE);
-            redisEasyTxTemplate.expire(txKey, 24, TimeUnit.HOURS);
-            redisEasyTxTemplate.exec();
+            try (Jedis jedis = jedisEasyTxPool.getResource(); Pipeline pipeline = jedis.pipelined()) {
+                pipeline.hset(txKey, "status", String.valueOf(Boolean.FALSE));
+                pipeline.expire(txKey, 24 * 60 * 60);
+            }
             throw e;
         } finally {
             if (sponsor) {

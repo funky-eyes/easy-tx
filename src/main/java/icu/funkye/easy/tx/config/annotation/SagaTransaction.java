@@ -16,7 +16,7 @@ public @interface SagaTransaction {
     /**
      * 提交方法
      */
-    String confirm();
+    String confirm() default "";
 
     /**
      * 失败补偿的bean
