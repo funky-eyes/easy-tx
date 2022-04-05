@@ -118,6 +118,7 @@ public class GlobalTXAspect {
                                     } else if (globalTx.getRetry()) {
                                         Map<String/*branchid*/, String/*saga branch*/> branchMap =
                                             jedis.hgetAll(globalKey);
+                                        // 绑定需要补偿的xid
                                         RootContext.bind(globalTx.getXid());
                                         if (branchMap == null || branchMap.isEmpty()) {
                                             jedis.del(tx);
@@ -126,6 +127,7 @@ public class GlobalTXAspect {
                                                 branchMap.forEach((k, v) -> {
                                                     SagaBranchTransaction sagaBranchTransaction =
                                                         JSONObject.parseObject(v, SagaBranchTransaction.class);
+                                                    // 往thread local中加入所有branch,后续rm被调用将通过hashcode判断是新分支,还是已注册的分支
                                                     SagaContext.addBranch(sagaBranchTransaction.hashCode(),
                                                         sagaBranchTransaction);
                                                 });
